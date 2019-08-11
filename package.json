@@ -1,0 +1,30 @@
+{
+  "name": "webpack-hmr",
+  "version": "1.0.0",
+  "description": "Easy implementation of webpack Hot-Module-Replacement(hmr)",
+  "main": "index.js",
+  "scripts": {
+    "dev": "webpack-dev-server",
+    "build": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/careteenL/webpack-hmr.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/careteenL/webpack-hmr/issues"
+  },
+  "homepage": "https://github.com/careteenL/webpack-hmr#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "html-webpack-plugin": "^3.2.0",
+    "mime": "^2.4.4",
+    "socket.io": "^2.2.0",
+    "webpack": "^4.39.1",
+    "webpack-cli": "^3.3.6",
+    "webpack-dev-server": "^3.7.2"
+  }
+}
