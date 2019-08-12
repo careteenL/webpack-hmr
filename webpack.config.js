@@ -10,12 +10,14 @@ module.exports = {
     filename: 'main.js'
   },
   devServer: {
+    hot: true,
     contentBase: path.join(__dirname, 'dist')
   },
   plugins: [
     new htmlWQebpackPlugin({
       template: './src/index.html',
       filename: 'index.html'
-    })
+    }),
+    new webpack.HotModuleReplacementPlugin()
   ]
 }
