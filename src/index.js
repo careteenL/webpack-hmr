@@ -2,7 +2,7 @@ import './client.js'
 
 var root = document.getElementById('root')
 function render () {
-  root.innerHTML = require('./content.js')
+  root.innerHTML = require('./content.js').default
 }
 render()
 

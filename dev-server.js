@@ -11,7 +11,7 @@ class Server {
     this.compiler = compiler
     let sockets = []
     let lasthash // 每次编译完成后都会产生一个stats对象，其中有一个hash值代表这一次编译结果hash就是一个32的字符串
-    compiler.hooks.done.tap('webpack-dev-server', (stats) => {
+    ;compiler.hooks.done.tap('webpack-dev-server', (stats) => {
       lasthash = stats.hash
       // 每当新一个编译完成后都会向客户端发送消息
       sockets.forEach(socket => {
@@ -57,7 +57,7 @@ class Server {
     // 启动一个 websocket服务器，然后等待连接来到，连接到来之后socket
     io.on('connection', (socket) => {
       sockets.push(socket)
-      socket.emit('hash', lastHash)
+      socket.emit('hash')
       // 再向客户端发送一个ok
       socket.emit('ok')
     })

@@ -16,6 +16,9 @@
   - webpack编译流程 - 为自己的博客引流
     - balabala
   - HMR流程图
+  - 服务端实现
+  - 客户端实现
+  - 
     
 
 ## TODO
@@ -236,7 +239,7 @@ if (module.hot) {
 
 ## debug服务端源码
 
-debug源码分析其详细思路
+debug服务端源码分析其详细思路
 
 1. 启动`webpack-dev-server`服务器，源代码地址[@webpack-dev-server/webpack-dev-server.js#L173](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/bin/webpack-dev-server.js#L173)
 1. 创建webpack实例，源代码地址[@webpack-dev-server/webpack-dev-server.js#L89](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/bin/webpack-dev-server.js#L89)
@@ -401,3 +404,197 @@ node dev-server.js
 - 发布订阅
 - ajax jsonp
   - 为什么不使用socket直接获取差异代码呢？因为拉代码过来可以直接执行
+
+debug服务端源码分析其详细思路
+
+1. webpack-dev-server/client端会监听到此hash消息，源代码地址[@webpack-dev-server/index.js#L54](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/client-src/default/index.js#L54)
+1. 客户端收到ok的消息后会执行reloadApp方法进行更新，源代码地址[index.js#L101](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/client-src/default/index.js#L101)
+1. 在reloadApp中会进行判断，是否支持热更新，如果支持的话发射webpackHotUpdate事件，如果不支持则直接刷新浏览器，源代码地址[reloadApp.js#L7](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/client-src/default/utils/reloadApp.js#L7)
+1. 在webpack/hot/dev-server.js会监听webpackHotUpdate事件，源代码地址[dev-server.js#L55](https://github.com/webpack/webpack/blob/v4.39.1/hot/dev-server.js#L55)
+1. 在check方法里会调用module.hot.check方法，源代码地址[dev-server.js#L13](https://github.com/webpack/webpack/blob/v4.39.1/hot/dev-server.js#L13)
+1. HotModuleReplacement.runtime请求Manifest，源代码地址[HotModuleReplacement.runtime.js#L180](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L180)
+1. 它通过调用 JsonpMainTemplate.runtime的hotDownloadManifest方法，源代码地址[JsonpMainTemplate.runtime.js#L23](https://github.com/webpack/webpack/blob/v4.39.1/lib/web/JsonpMainTemplate.runtime.js#L23)
+1. 调用JsonpMainTemplate.runtime的hotDownloadUpdateChunk方法通过JSONP请求获取到最新的模块代码，源代码地址[JsonpMainTemplate.runtime.js#L14](https://github.com/webpack/webpack/blob/v4.39.1/lib/web/JsonpMainTemplate.runtime.js#L14)
+1. 补丁JS取回来后会调用JsonpMainTemplate.runtime.js的webpackHotUpdate方法，源代码地址[JsonpMainTemplate.runtime.js#L8](https://github.com/webpack/webpack/blob/v4.39.1/lib/web/JsonpMainTemplate.runtime.js#L8)
+1. 然后会调用HotModuleReplacement.runtime.js的hotAddUpdateChunk方法动态更新模块代码，源代码地址[HotModuleReplacement.runtime.js#L222](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L222)
+1. 然后调用hotApply方法进行热更新，源代码地址[HotModuleReplacement.runtime.js#L257](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L257)、[HotModuleReplacement.runtime.js#L278](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L278)
+
+### 简易实现
+
+上面是我通过debug得出dev-server运行流程比较核心的几个点，下面将其[抽象成一个文件](./dev-server.js)。
+
+#### webpack-dev-server/client端会监听到此hash消息
+```js
+let socket = io('/')
+socket.on('connect', onConnected)
+const onConnected = () => {
+  console.log('客户端连接成功')
+}
+let hotCurrentHash // lastHash 上一次 hash值 
+let currentHash // 这一次的hash值
+socket.on('hash', (hash) => {
+  debugger
+  currentHash = hash
+})
+```
+#### 客户端收到ok的消息后会执行reloadApp方法进行更新
+```js
+socket.on('ok', () => {
+  reloadApp(true)
+})
+```
+#### 在reloadApp中会进行判断，是否支持热更新，如果支持的话发射webpackHotUpdate事件，如果不支持则直接刷新浏览器
+```js
+// 当收到ok事件后，会重新刷新app
+function reloadApp(hot) {
+  if (hot) { // 如果hot为true 走热更新的逻辑
+    hotEmitter.emit('webpackHotUpdate')
+  } else { // 如果不支持热更新，则直接重新加载
+    window.location.reload()
+  }
+}
+```
+#### 在webpack/hot/dev-server.js会监听webpackHotUpdate事件
+```js
+class Emitter {
+  constructor() {
+    this.listeners = {}
+  }
+  on(type, listener) {
+    this.listeners[type] = listener
+  }
+  emit(type) {
+    this.listeners[type] && this.listeners[type]()
+  }
+}
+let hotEmitter = new Emitter()
+hotEmitter.on('webpackHotUpdate', () => {
+  debugger
+  if (!hotCurrentHash || hotCurrentHash == currentHash) {
+    return hotCurrentHash = currentHash
+  }
+  hotCheck()
+})
+```
+#### 在check方法里会调用module.hot.check方法
+```js
+function hotCheck() {
+  hotDownloadManifest().then(update => {
+    let chunkIds = Object.keys(update.c)
+    chunkIds.forEach(chunkId => {
+      hotDownloadUpdateChunk(chunkId)
+    })
+  })
+}
+```
+#### HotModuleReplacement.runtime请求Manifest
+```js
+function hotCheck() {
+  hotDownloadManifest().then(update => {
+    let chunkIds = Object.keys(update.c)
+    chunkIds.forEach(chunkId => {
+      hotDownloadUpdateChunk(chunkId)
+    })
+  })
+}
+```
+#### 它通过调用 JsonpMainTemplate.runtime的hotDownloadManifest方法
+```js
+// 此方法用来去询问服务器到底这一次编译相对于上一次编译改变了哪些chunk?哪些模块?
+function hotDownloadManifest() {
+  return new Promise(function (resolve) {
+    let request = new XMLHttpRequest()
+    //hot-update.json文件里存放着从上一次编译到这一次编译 取到差异
+    let requestPath = '/' + hotCurrentHash + ".hot-update.json"
+    request.open('GET', requestPath, true)
+    request.onreadystatechange = function () {
+      if (request.readyState === 4) {
+        let update = JSON.parse(request.responseText)
+        resolve(update)
+      }
+    }
+    request.send()
+  })
+}
+```
+#### 调用JsonpMainTemplate.runtime的hotDownloadUpdateChunk方法通过JSONP请求获取到最新的模块代码
+```js
+function hotDownloadUpdateChunk(chunkId) {
+  let script = document.createElement('script')
+  script.charset = 'utf-8'
+  // /main.xxxx.hot-update.js
+  script.src = '/' + chunkId + "." + hotCurrentHash + ".hot-update.js"
+  document.head.appendChild(script)
+}
+```
+#### 补丁JS取回来后会调用JsonpMainTemplate.runtime.js的webpackHotUpdate方法
+```js
+// 当客户端把最新的代码拉到浏览之后
+window.webpackHotUpdate = function (chunkId, moreModules) {
+  // 循环新拉来的模块
+  for (let moduleId in moreModules) {
+    // 从模块缓存中取到老的模块定义
+    let oldModule = __webpack_require__.c[moduleId]
+    // parents哪些模块引用这个模块 children这个模块引用了哪些模块
+    // parents=['./src/index.js']
+    let {
+      parents,
+      children
+    } = oldModule
+    // 更新缓存为最新代码 缓存进行更新
+    let module = __webpack_require__.c[moduleId] = {
+      i: moduleId,
+      l: false,
+      exports: {},
+      parents,
+      children,
+      hot: window.hotCreateModule(moduleId)
+    }
+    moreModules[moduleId].call(module.exports, module, module.exports, __webpack_require__)
+    module.l = true // 状态变为加载就是给module.exports 赋值了
+    parents.forEach(parent => {
+      debugger // parents=['./src/index.js']
+      let parentModule = __webpack_require__.c[parent]
+      // _acceptedDependencies={'./src/title.js',render}
+      parentModule && parentModule.hot && parentModule.hot._acceptedDependencies[moduleId] && parentModule.hot._acceptedDependencies[moduleId]()
+    })
+    hotCurrentHash = currentHash
+  }
+}
+```
+#### 然后会调用HotModuleReplacement.runtime.js的hotAddUpdateChunk方法动态更新模块代码
+```js
+
+```
+#### 然后调用hotApply方法进行热更新
+```js
+window.hotCreateModule = function () {
+  let hot = {
+    _acceptedDependencies: {},
+    dispose() {
+      // 销毁老的元素
+    },
+    accept: function (deps, callback) {
+      for (let i = 0; i < deps.length; i++) {
+        // hot._acceptedDependencies={'./title': render}
+        hot._acceptedDependencies[deps[i]] = callback
+      }
+    }
+  }
+  return hot
+}
+```
+
+### 调试阶段
+
+经过上述实现了一个基本版的HMR，可更改代码保存的同时查看浏览器并非整体刷新，而是局部更新代码进而更新视图。在涉及到大量表单的需求时大大提高了开发效率。
+
+## 答疑
+
+- 如何实现commonjs规范？
+- webpack实现流程以及各个生命周期的作用是什么？
+- 发布订阅的使用和实现，并且如何实现一个可先订阅后发布的机制？
+- 为什么使用JSONP而不用socke通信获取更新过的代码？
+- socket长连接的实现原理又是什么？
+
+## 总结
