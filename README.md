@@ -2,29 +2,22 @@
 
 ## 目录
 
-- HMR简单介绍
-  - 是什么东西
-  - 为什么需要他
-  - 有没有更好的方案
-- HMR简单使用
-  - 如何配置
-  - 有什么优势
-- 一层层剥开
-  - webpack的模块规范
-    - 核心实现详解
-    - commonjs的require规范实现
-  - webpack编译流程
-    - balabala
-  - HMR流程图
-  - 服务端实现
-  - 客户端实现
-  - 
+- [HMR是什么](#HMR是什么)
+  - [使用场景](#使用场景)
+- [配置使用HMR](#配置使用HMR)
+  - [配置webpack](#配置webpack)
+  - [解析webpack打包后的文件内容](#解析webpack打包后的文件内容)
+  - [配置HMR](#配置HMR)
+- [HMR原理](#HMR原理)
+- [debug服务端源码](#debug服务端源码)
+  - [服务端简易实现](#服务端简易实现)
+  - [服务端调试阶段](#服务端调试阶段)
+- [debug客户端源码](#debug客户端源码)
+  - [客户端简易实现](#客户端简易实现)
+  - [客户端调试阶段](#客户端调试阶段)
+- [问题](#问题)
+- [总结](#总结)
     
-
-## TODO
-
-- 
-
 ## HMR是什么
 
 `HMR`即`Hot Module Replacement`是指当你对代码修改并保存后，`webpack`将会对代码进行重新打包，并将改动的模块发送到浏览器端，浏览器用新的模块替换掉旧的模块，去实现局部更新页面而非整体刷新页面。
@@ -199,8 +192,9 @@ dist目录结构
 ### 配置HMR
 
 接下来配置并感受一下热更新带来的便捷开发
+
+`webpack.config.js`配置
 ```js
-// webpack.config.js
   // ...
   devServer: {
     hot: true
@@ -208,8 +202,8 @@ dist目录结构
   // ...
 ```
 
+`./src/index.js`配置
 ```js
-// ./src/index.js
 // ...
 if (module.hot) {
   module.hot.accept(['./content.js'], () => {
@@ -225,21 +219,25 @@ if (module.hot) {
 
 ![core](./assets/2-core.jpg)
 
-如上图所示，`Server`端使用`webpack-dev-server`去启动本地服务，内部实现主要使用了`webpack`、`express`、`websocket`。
+如上图所示，右侧`Server`端使用`webpack-dev-server`去启动本地服务，内部实现主要使用了`webpack`、`express`、`websocket`。
 
 - 使用`express`启动本地服务，当浏览器访问资源时对此做响应。
 - 服务端和客户端使用`websocket`实现长连接
 - `webpack`监听源文件的变化，即当开发者保存文件时触发`webpack`的重新编译。
-  - 每次编译都会生成一个`hash戳`以及文件
+  - 每次编译都会生成`hash值`、`已改动模块的json文件`、`已改动模块代码的js文件`
   - 编译完成后通过`socket`向客户端推送当前编译的`hash戳`
 - 客户端的`websocket`监听到有文件改动推送过来的`hash戳`，会和上一次对比
   - 一致则走缓存
   - 不一致则通过`ajax`和`jsonp`向服务端获取最新资源
 - 使用`内存文件系统`去替换有修改的内容实现局部刷新
 
+上图先只看个大概，下面将从服务端和客户端两个方面进行详细分析
+
 ## debug服务端源码
 
-debug服务端源码分析其详细思路
+![core](./assets/2-core.jpg)
+
+**现在也只需要关注上图的右侧服务端部分，左侧可以暂时忽略。下面步骤主要是debug服务端源码分析其详细思路，也给出了代码所处的具体位置，感兴趣的可以先行定位到下面的代码处设置断点，然后观察数据的变化情况。也可以先跳过阅读此步骤。**
 
 1. 启动`webpack-dev-server`服务器，源代码地址[@webpack-dev-server/webpack-dev-server.js#L173](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/bin/webpack-dev-server.js#L173)
 1. 创建webpack实例，源代码地址[@webpack-dev-server/webpack-dev-server.js#L89](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/bin/webpack-dev-server.js#L89)
@@ -255,9 +253,9 @@ debug服务端源码分析其详细思路
 1. 使用sockjs在浏览器端和服务端之间建立一个 websocket 长连接，源代码地址[@webpack-dev-server/Server.js#L745](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/lib/Server.js#L745)
   1. 创建socket服务器，源代码地址[@webpack-dev-server/SockJSServer.js#L34](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/lib/servers/SockJSServer.js#L34)
 
-### 简易实现
+### 服务端简易实现
 
-上面是我通过debug得出dev-server运行流程比较核心的几个点，下面将其[抽象成一个文件](./dev-server.js)。
+上面是我通过debug得出dev-server运行流程比较核心的几个点，下面将其[抽象整合到一个文件中](./dev-server.js)。
 
 #### 启动webpack-dev-server服务器
 先导入所有依赖
@@ -291,6 +289,7 @@ class Server {
 let server = new Server(compiler)
 server.listen(8000)
 ```
+在后面是通过express来当启动服务的
 
 #### 添加webpack的done事件回调
 
@@ -318,11 +317,13 @@ server.listen(8000)
 ```js
 let app = new express()
 ```
+
 #### 设置文件系统为内存文件系统
 ```js
 let fs = new MemoryFileSystem()
 ```
-如果你把compiler的输出文件系统改成了 MemoryFileSystem的话，则以后再产出文件都打包内存里去了
+使用`MemoryFileSystem`将`compiler`的产出文件打包到内存中。
+
 #### 添加webpack-dev-middleware中间件
 ```js
   function middleware(req, res, next) {
@@ -352,7 +353,7 @@ let fs = new MemoryFileSystem()
     console.log('又一次编译任务成功完成了')
   })
 ```
-以监控的模块启动一次webpack编译，当编译成功之后执行回调
+以监控的模式启动一次webpack编译，当编译成功之后执行回调
 
 #### 创建http服务器并启动服务
 
@@ -387,7 +388,7 @@ let fs = new MemoryFileSystem()
 
 当有文件改动，webpack重新编译时，向客户端推送`hash`和`ok`两个事件
 
-### 调试阶段
+### 服务端调试阶段
 
 感兴趣的可以根据上面[debug服务端源码](#debug服务端源码)所带的源码位置，并在浏览器的调试模式下设置断点查看每个阶段的值。
 
@@ -400,12 +401,11 @@ node dev-server.js
 
 ## debug客户端源码
 
-- socket
-- 发布订阅
-- ajax jsonp
-  - 为什么不使用socket直接获取差异代码呢？因为拉代码过来可以直接执行
+![core](./assets/2-core.jpg)
 
-debug服务端源码分析其详细思路
+**现在也只需要关注上图的左侧客户端部分，右侧可以暂时忽略。下面步骤主要是debug客户端源码分析其详细思路，也给出了代码所处的具体位置，感兴趣的可以先行定位到下面的代码处设置断点，然后观察数据的变化情况。也可以先跳过阅读此步骤。**
+
+debug客户端源码分析其详细思路
 
 1. webpack-dev-server/client端会监听到此hash消息，源代码地址[@webpack-dev-server/index.js#L54](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/client-src/default/index.js#L54)
 1. 客户端收到ok的消息后会执行reloadApp方法进行更新，源代码地址[index.js#L101](https://github.com/webpack/webpack-dev-server/blob/v3.7.2/client-src/default/index.js#L101)
@@ -419,11 +419,16 @@ debug服务端源码分析其详细思路
 1. 然后会调用HotModuleReplacement.runtime.js的hotAddUpdateChunk方法动态更新模块代码，源代码地址[HotModuleReplacement.runtime.js#L222](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L222)
 1. 然后调用hotApply方法进行热更新，源代码地址[HotModuleReplacement.runtime.js#L257](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L257)、[HotModuleReplacement.runtime.js#L278](https://github.com/webpack/webpack/blob/v4.39.1/lib/HotModuleReplacement.runtime.js#L278)
 
-### 简易实现
+### 客户端简易实现
 
-上面是我通过debug得出dev-server运行流程比较核心的几个点，下面将其[抽象成一个文件](./dev-server.js)。
+上面是我通过debug得出dev-server运行流程比较核心的几个点，下面将其[抽象整合成一个文件](./src/client.js)。
 
 #### webpack-dev-server/client端会监听到此hash消息
+在开发客户端功能之前，需要在`src/index.html`中引入`socket.io`
+```html
+<script src="/socket.io/socket.io.js"></script>
+```
+下面连接socket并接受消息
 ```js
 let socket = io('/')
 socket.on('connect', onConnected)
@@ -433,17 +438,18 @@ const onConnected = () => {
 let hotCurrentHash // lastHash 上一次 hash值 
 let currentHash // 这一次的hash值
 socket.on('hash', (hash) => {
-  debugger
   currentHash = hash
 })
 ```
+将服务端webpack每次编译所产生`hash`进行缓存
+
 #### 客户端收到ok的消息后会执行reloadApp方法进行更新
 ```js
 socket.on('ok', () => {
   reloadApp(true)
 })
 ```
-#### 在reloadApp中会进行判断，是否支持热更新，如果支持的话发射webpackHotUpdate事件，如果不支持则直接刷新浏览器
+#### reloadApp中判断是否支持热更新
 ```js
 // 当收到ok事件后，会重新刷新app
 function reloadApp(hot) {
@@ -454,7 +460,10 @@ function reloadApp(hot) {
   }
 }
 ```
+在reloadApp中会进行判断，是否支持热更新，如果支持的话发射webpackHotUpdate事件，如果不支持则直接刷新浏览器。
 #### 在webpack/hot/dev-server.js会监听webpackHotUpdate事件
+
+首先需要一个发布订阅去绑定事件并在合适的时机触发。
 ```js
 class Emitter {
   constructor() {
@@ -469,13 +478,16 @@ class Emitter {
 }
 let hotEmitter = new Emitter()
 hotEmitter.on('webpackHotUpdate', () => {
-  debugger
   if (!hotCurrentHash || hotCurrentHash == currentHash) {
     return hotCurrentHash = currentHash
   }
   hotCheck()
 })
 ```
+会判断是否为第一次进入页面和代码是否有更新。
+
+> 上面的发布订阅较为简单，且只支持先发布后订阅功能。对于一些较为复杂的场景可能需要先订阅后发布，此时可以移步[@careteen/event-emitter](https://github.com/careteenL/event-emitter)。其实现原理也挺简单，需要维护一个离线事件栈存放还没发布就订阅的事件，等到订阅时可以取出所有事件执行。
+
 #### 在check方法里会调用module.hot.check方法
 ```js
 function hotCheck() {
@@ -487,20 +499,15 @@ function hotCheck() {
   })
 }
 ```
-#### HotModuleReplacement.runtime请求Manifest
+
+上面也提到过webpack每次编译都会产生`hash值`、`已改动模块的json文件`、`已改动模块代码的js文件`，
+
+此时先使用`ajax`请求`Manifest`即服务器这一次编译相对于上一次编译改变了哪些module和chunk。
+
+然后再通过`jsonp`获取这些已改动的module和chunk的代码。
+
+#### 调用hotDownloadManifest方法
 ```js
-function hotCheck() {
-  hotDownloadManifest().then(update => {
-    let chunkIds = Object.keys(update.c)
-    chunkIds.forEach(chunkId => {
-      hotDownloadUpdateChunk(chunkId)
-    })
-  })
-}
-```
-#### 它通过调用 JsonpMainTemplate.runtime的hotDownloadManifest方法
-```js
-// 此方法用来去询问服务器到底这一次编译相对于上一次编译改变了哪些chunk?哪些模块?
 function hotDownloadManifest() {
   return new Promise(function (resolve) {
     let request = new XMLHttpRequest()
@@ -517,7 +524,8 @@ function hotDownloadManifest() {
   })
 }
 ```
-#### 调用JsonpMainTemplate.runtime的hotDownloadUpdateChunk方法通过JSONP请求获取到最新的模块代码
+
+#### 调用hotDownloadUpdateChunk方法通过JSONP请求获取到最新的模块代码
 ```js
 function hotDownloadUpdateChunk(chunkId) {
   let script = document.createElement('script')
@@ -527,9 +535,12 @@ function hotDownloadUpdateChunk(chunkId) {
   document.head.appendChild(script)
 }
 ```
-#### 补丁JS取回来后会调用JsonpMainTemplate.runtime.js的webpackHotUpdate方法
+这里解释下为什么使用`JSONP`获取而不直接利用`socket`获取最新代码？主要是因为`JSONP`获取的代码可以直接执行。
+
+#### 调用webpackHotUpdate方法
+当客户端把最新的代码拉到浏览之后
+
 ```js
-// 当客户端把最新的代码拉到浏览之后
 window.webpackHotUpdate = function (chunkId, moreModules) {
   // 循环新拉来的模块
   for (let moduleId in moreModules) {
@@ -553,7 +564,7 @@ window.webpackHotUpdate = function (chunkId, moreModules) {
     moreModules[moduleId].call(module.exports, module, module.exports, __webpack_require__)
     module.l = true // 状态变为加载就是给module.exports 赋值了
     parents.forEach(parent => {
-      debugger // parents=['./src/index.js']
+      // parents=['./src/index.js']
       let parentModule = __webpack_require__.c[parent]
       // _acceptedDependencies={'./src/title.js',render}
       parentModule && parentModule.hot && parentModule.hot._acceptedDependencies[moduleId] && parentModule.hot._acceptedDependencies[moduleId]()
@@ -562,11 +573,10 @@ window.webpackHotUpdate = function (chunkId, moreModules) {
   }
 }
 ```
-#### 然后会调用HotModuleReplacement.runtime.js的hotAddUpdateChunk方法动态更新模块代码
-```js
 
-```
-#### 然后调用hotApply方法进行热更新
+#### hotCreateModule的实现
+
+实现我们可以在业务代码中定义需要热更新的模块以及回调函数，将其存放在`hot._acceptedDependencies`中。
 ```js
 window.hotCreateModule = function () {
   let hot = {
@@ -585,16 +595,40 @@ window.hotCreateModule = function () {
 }
 ```
 
-### 调试阶段
+然后在`webpackHotUpdate`中进行调用
+```js
+    parents.forEach(parent => {
+      // parents=['./src/index.js']
+      let parentModule = __webpack_require__.c[parent]
+      // _acceptedDependencies={'./src/title.js',render}
+      parentModule && parentModule.hot && parentModule.hot._acceptedDependencies[moduleId] && parentModule.hot._acceptedDependencies[moduleId]()
+    })
+```
+最后调用hotApply方法进行热更新
+
+### 客户端调试阶段
 
 经过上述实现了一个基本版的HMR，可更改代码保存的同时查看浏览器并非整体刷新，而是局部更新代码进而更新视图。在涉及到大量表单的需求时大大提高了开发效率。
 
-## 答疑
+## 问题
 
 - 如何实现commonjs规范？
+> 感兴趣的可前往[debug CommonJs规范](https://github.com/careteenL/blog/blob/master/src/20181201-node/module.md)了解其实现原理。
+
 - webpack实现流程以及各个生命周期的作用是什么？
+> webpack主要借助了`tapable`这个库所提供的一系列同步/异步钩子函数贯穿整个生命周期。![webpack生命周期](https://img.alicdn.com/tps/TB1GVGFNXXXXXaTapXXXXXXXXXX-4436-4244.jpg)基于此我实现了一版简易的[webpack](https://github.com/careteenL/webpack)，源码100+行，食用时伴着注释很容易消化，感兴趣的可前往看个思路。
+
 - 发布订阅的使用和实现，并且如何实现一个可先订阅后发布的机制？
+> 上面也提到需要使用到发布订阅模式，且只支持先发布后订阅功能。对于一些较为复杂的场景可能需要先订阅后发布，此时可以移步[@careteen/event-emitter](https://github.com/careteenL/event-emitter)。其实现原理也挺简单，需要维护一个离线事件栈存放还没发布就订阅的事件，等到订阅时可以取出所有事件执行。
+
 - 为什么使用JSONP而不用socke通信获取更新过的代码？
-- socket长连接的实现原理又是什么？
+> 因为通过socket通信获取的是一串字符串需要再做处理。而通过`JSONP`获取的代码可以直接执行。
 
 ## 总结
+
+TODO: add
+
+- 可能存在的坑
+- 你可能不需要它！
+- 什么场景下才真正的需要它？
+- 上面代码量较多，主要目的是学习实现思路。细节自行debug。
