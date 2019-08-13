@@ -12,8 +12,8 @@
 - 一层层剥开
   - webpack的模块规范
     - 核心实现详解
-    - commonjs的require规范实现 - 为自己的博客引流
-  - webpack编译流程 - 为自己的博客引流
+    - commonjs的require规范实现
+  - webpack编译流程
     - balabala
   - HMR流程图
   - 服务端实现
