@@ -63,7 +63,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "383b09de63bded6d8e0b";
+/******/ 	var hotCurrentHash = "d867f5bac7f4f690087a";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -815,7 +815,7 @@ eval("let socket = io('/')\nclass Emitter {\n  constructor() {\n    this.listene
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\nvar ret = 'Hello Webpack Hot Module Replacement 8'\n\n// module.exports = ret\n/* harmony default export */ __webpack_exports__[\"default\"] = (ret);\n\n//# sourceURL=webpack:///./src/content.js?");
+eval("__webpack_require__.r(__webpack_exports__);\nvar ret = 'Hello Webpac2k Hot Module Replacement '\n\n// module.exports = ret\n/* harmony default export */ __webpack_exports__[\"default\"] = (ret);\n\n//# sourceURL=webpack:///./src/content.js?");
 
 /***/ }),
 
@@ -827,7 +827,7 @@ eval("__webpack_require__.r(__webpack_exports__);\nvar ret = 'Hello Webpack Hot 
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./client.js */ \"./src/client.js\");\n/* harmony import */ var _client_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_client_js__WEBPACK_IMPORTED_MODULE_0__);\n\n\nvar root = document.getElementById('root')\nfunction render () {\n  root.innerHTML = __webpack_require__(/*! ./content.js */ \"./src/content.js\").default\n}\nrender()\n\nif (true) {\n  module.hot.accept([/*! ./content.js */ \"./src/content.js\"], function(__WEBPACK_OUTDATED_DEPENDENCIES__) { (() => {\n    render()\n  })(__WEBPACK_OUTDATED_DEPENDENCIES__); }.bind(this))\n}\n\n\n//# sourceURL=webpack:///./src/index.js?");
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./client.js */ \"./src/client.js\");\n/* harmony import */ var _client_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_client_js__WEBPACK_IMPORTED_MODULE_0__);\n\nvar root = document.getElementById('root')\nvar input = document.createElement('input')\ninput.placeholder = '请输入手机号'\ndocument.body.appendChild(input)\n\nfunction render () {\n  root.innerHTML = __webpack_require__(/*! ./content.js */ \"./src/content.js\").default\n}\nrender()\n\nif (true) {\n  module.hot.accept([/*! ./content.js */ \"./src/content.js\"], function(__WEBPACK_OUTDATED_DEPENDENCIES__) { (() => {\n    render()\n  })(__WEBPACK_OUTDATED_DEPENDENCIES__); }.bind(this))\n}\n\n\n//# sourceURL=webpack:///./src/index.js?");
 
 /***/ })
 

@@ -1,6 +1,6 @@
 const path = require('path')
 const webpack = require('webpack')
-const htmlWQebpackPlugin = require('html-webpack-plugin')
+const htmlWebpackPlugin = require('html-webpack-plugin')
 
 module.exports = {
   mode: 'development',
@@ -14,7 +14,7 @@ module.exports = {
     contentBase: path.join(__dirname, 'dist')
   },
   plugins: [
-    new htmlWQebpackPlugin({
+    new htmlWebpackPlugin({
       template: './src/index.html',
       filename: 'index.html'
     }),

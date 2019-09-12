@@ -1,4 +1,4 @@
-var ret = 'Hello Webpack Hot Module Replacement 12'
+var ret = 'Hello Webpac2k Hot Module Replacement '
 
 // module.exports = ret
 export default ret
